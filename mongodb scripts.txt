@@ -1,0 +1,78 @@
+Register into MongoDB:
+export PATH=$PATH:/usr/local/mongodb/bin
+mongo mongodb://root:Shuaiwen123@dds-wz957d8e74bf4cc4-pub.mongodb.rds.aliyuncs.com:3717/admin
+Use douyin
+Show collections
+
+
+
+1. the most popular challenges according to the number of video under the challenge topic
+#douyin challenges sorted by video numbers 
+var c = db.post.aggregate([{$match:{'aweme_list.cha_list': {'$exists': true}}},{"$unwind":"$aweme_list"}, {"$unwind":"$aweme_list.cha_list"}, {"$group":{"_id":"$aweme_list.cha_list.cid", count:{$sum:1}}}, {"$sort":{count:-1}}, {"$limit":200}, {"$out":"tempCollection"}], {allowDiskUse: true});
+
+#print it to a json file
+db.tempCollection.find().noCursorTimeout().forEach(function(doc) {print(doc._id + "," + doc.count);})
+
+
+2. douyin description
+#douyin description except desc = '抖音，记录美好生活' and save to a temporary collection tempDescCollection
+var d = db.post.aggregate([{$match:{'aweme_list.cha_list': {'$exists': true}, 'aweme_list.cha_list.share_info.share_desc':{'$ne':"在抖音，记录美好生活"}}},{"$unwind":"$aweme_list"}, {"$unwind":"$aweme_list.cha_list"}, {"$group":{"_id":{cid:"$aweme_list.cha_list.cid",chal_desc:"$aweme_list.cha_list.share_info.share_desc"}}}, {"$sort":{count:-1}}, {"$out":"tempDescCollection"}], {allowDiskUse: true})
+
+#print it to a json file
+db.tempDescCollection.find().noCursorTimeout().forEach(function(docDesc) {print(docDesc._id.cid+','+docDesc._id.cha_desc);})
+
+#save it to a csv file by a python script(json loading always failed). NOT RUN in mongo shell
+JENNYLV-MC0:mongodb cecexu$ vim mongo_export.py
+
+3. popular challenges according to number of likes
+#douyin challenges with like numbers and sorted by video numbers
+var c = db.post.aggregate([{$match:{'aweme_list.cha_list': {'$exists': true}}},{"$unwind":"$aweme_list"}, {"$unwind":"$aweme_list.cha_list"}, {"$group":{"_id":"$aweme_list.cha_list.cid", count:{$sum:1}, "total_like":{$sum:"$aweme_list.statistics.digg_count"}}},{"$sort":{total_like:-1}},{"$limit":300}, {"$out":"tempLikeCollection"}], {allowDiskUse: true})
+
+#
+db.tempLikeCollection.find().noCursorTimeout().forEach(function(doc) {print(doc._id + "," + doc.count + ',' + doc.total_like);});
+
+
+UNIX time
+Start1 = 1540742400   #10.29
+End1 = 1541347199     #11.04
+Start2 = 1540137600   #10.22
+End2 = 1540742399     #10.28
+
+
+4. popular challenges according to number of videos between 10.29-11.04
+#temp collections of week 10.29-11.04 which was sorted by video counts 
+var c = db.post.aggregate([{$match:{'$and':[{'aweme_list.create_time':{"$gte": start1, "$lt": end1}},{'aweme_list.cha_list': {'$exists': true}}]}},{"$unwind":"$aweme_list"}, {"$unwind":"$aweme_list.cha_list"}, {"$group":{"_id":"$aweme_list.cha_list.cid", count:{$sum:1}, "total_like":{$sum:"$aweme_list.statistics.digg_count"}}},{"$sort":{count:-1}},{"$limit":300}, {"$out":"tempWeek1Collection"}], {allowDiskUse: true})
+
+#output temp collections of week 10.29-11.04 which was sorted by video counts 
+db.tempWeek1Collection.find().noCursorTimeout().forEach(function(doc) {print(doc._id + "," + doc.count + ',' + doc.total_like);});
+
+5. popular challenges according to number of likes between 10.29-11.04
+#temp collections of week 10.29-11.04 which was sorted by number of likes
+var c = db.post.aggregate([{$match:{'$and':[{'aweme_list.create_time':{"$gte": start1, "$lt": end1}},{'aweme_list.cha_list': {'$exists': true}}]}},{"$unwind":"$aweme_list"}, {"$unwind":"$aweme_list.cha_list"}, {"$group":{"_id":"$aweme_list.cha_list.cid", count:{$sum:1}, "total_like":{$sum:"$aweme_list.statistics.digg_count"}}},{"$sort":{total_like:-1}},{"$limit":300}, {"$out":"tempWeek1LikeCollection"}], {allowDiskUse: true})
+
+#output temp collections of week 10.29-11.04 which was sorted by number of likes 
+db.tempWeek1LikeCollection.find().noCursorTimeout().forEach(function(doc) {print(doc._id + "," + doc.count + ',' + doc.total_like);});
+
+6.popular challenges according to number of videos between 10.22-10.28
+var c = db.post.aggregate([{$match:{'$and':[{'aweme_list.create_time':{"$gte": Start2, "$lt": End2}},{'aweme_list.cha_list': {'$exists': true}}]}},{"$unwind":"$aweme_list"}, {"$unwind":"$aweme_list.cha_list"}, {"$group":{"_id":"$aweme_list.cha_list.cid", count:{$sum:1}, "total_like":{$sum:"$aweme_list.statistics.digg_count"}}},{"$sort":{count:-1}},{"$limit":300}, {"$out":"tempWeek2Collection"}], {allowDiskUse: true})
+
+
+7.print challenges and description, name
+var d = db.post.aggregate([{$match:{'aweme_list.cha_list': {'$exists': true}, 'aweme_list.cha_list.share_info.share_desc':{'$ne':"在抖音，记录美好生活"}}},{"$unwind":"$aweme_list"}, {"$unwind":"$aweme_list.cha_list"}, {"$group":{"_id":{cid:"$aweme_list.cha_list.cid",cha_desc:"$aweme_list.cha_list.share_info.share_desc",cha_name: "$aweme_list.cha_list.cha_name"}}}, {"$out":"tempAllDescCollection"}], {allowDiskUse: true})
+
+db.tempAllDescCollection.find().noCursorTimeout().forEach(function(docDesc) {print(docDesc._id.cid+','+docDesc._id.cha_desc+','+docDesc._id.cha_name);})
+
+8. Print challenges and url
+var d = db.post.aggregate([{$match:{'aweme_list.cha_list': {'$exists': true}, 'aweme_list.cha_list.share_info.share_desc':{'$ne':"在抖音，记录美好生活"}}},{"$unwind":"$aweme_list"}, {"$unwind":"$aweme_list.cha_list"}, {"$group":{"_id":{cid:"$aweme_list.cha_list.cid",cha_url:"$aweme_list.cha_list.share_info.share_url"}}}, {"$out":"tempUrlCollection"}], {allowDiskUse: true})
+
+
+
+
+Url后缀不同，导致同一cid对应不同后缀url，需要找出url主干
+
+
+
+var d = db.post.aggregate([{$match:{'aweme_list.cha_list': {'$exists': true}, 'aweme_list.cha_list.share_info.share_desc':{'$ne':"在抖音，记录美好生活"}}},{"$unwind":"$aweme_list"}, {"$unwind":"$aweme_list.cha_list"}, {"$group":{"_id":{cid:"$aweme_list.cha_list.cid",cha_desc:"$aweme_list.cha_list.share_info.share_desc",cha_name: "$aweme_list.cha_list.cha_name"},count:{$sum:1}, "total_like":{$sum:"$aweme_list.statistics.digg_count"}}}, {"$out":"tempTryCollection"}], {allowDiskUse: true})
+
+db.tempTryCollection.find().noCursorTimeout().forEach(function(doc) {print([doc._id.cid+','+doc._id.cha_desc+','+doc._id.cha_name] + "," + doc.count + ',' + doc.total_like);})
+
